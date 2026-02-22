@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesh Network PRO (Устройства = Сервера)</title>
+    <style>
+        :root {
+            --bg-dark: #0e1621; --bg-panel: #17212b; --bg-hover: #202b36;
+            --text-main: #f5f5f5; --text-muted: #7f91a4; --accent: #5288c1;
+            --msg-in: #182533; --msg-out: #2b5278; --border: #101921;
+            --danger: #e53935; --success: #43a047; --mesh-color: #bb86fc;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #3f4a54; border-radius: 3px; }
+
+        /* --- АВТОРИЗАЦИЯ --- */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-dark); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .auth-box { background: var(--bg-panel); padding: 30px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.6); }
+        .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .auth-tab { flex: 1; padding: 10px; cursor: pointer; color: var(--text-muted); font-weight: bold; }
+        .auth-tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        .auth-box input { width: 100%; padding: 12px; margin: 10px 0; background: var(--bg-dark); border: 1px solid var(--border); color: white; border-radius: 6px; outline: none; }
+        .auth-box button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+
+        /* --- ИНТЕРФЕЙС --- */
+        #app { display: none; width: 100%; height: 100%; }
+        #sidebar { width: 320px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: #1c2733; }
+        .user-info { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+        .logout-btn { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 14px; }
+        
+        #network-status { font-size: 12px; color: var(--mesh-color); text-align: center; padding: 8px; background: #000; border-bottom: 1px solid var(--border); }
+        
+        #contacts-list { flex: 1; overflow-y: auto; }
+        .contact-item { padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; transition: 0.2s; }
+        .contact-item.active { background: var(--bg-hover); border-left: 3px solid var(--mesh-color); }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #8e24aa); display: flex; justify-content: center; align-items: center; font-weight: bold; margin-right: 15px; font-size: 18px; }
+
+        /* Чат */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background: url('https://www.transparenttextures.com/patterns/stardust.png') #0e1621; position: relative; }
+        .chat-header { padding: 15px 20px; background: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .call-btn { background: var(--success); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; display: flex; gap: 5px; align-items: center;}
+
+        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 65%; padding: 10px 15px; border-radius: 15px; word-wrap: break-word; position: relative; line-height: 1.4; display: flex; flex-direction: column; }
+        .msg-in { background: var(--msg-in); align-self: flex-start; border-bottom-left-radius: 0; }
+        .msg-out { background: var(--msg-out); align-self: flex-end; border-bottom-right-radius: 0; }
+        .msg-sender { font-size: 0.75em; color: var(--mesh-color); margin-bottom: 4px; font-weight: bold; }
+        .msg-time { font-size: 0.7em; color: var(--text-muted); align-self: flex-end; margin-top: 5px; }
+
+        .chat-input-area { padding: 15px; background: var(--bg-panel); display: flex; align-items: center; gap: 10px; }
+        .chat-input-area input { flex: 1; padding: 14px 20px; background: var(--bg-dark); border: 1px solid var(--border); border-radius: 25px; color: white; outline: none; font-size: 15px; }
+        .send-btn { background: var(--accent); border: none; color: white; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center; }
+
+        /* --- ЗВОНКИ --- */
+        #call-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(14, 22, 33, 0.95); z-index: 500; display: none; flex-direction: column; justify-content: center; align-items: center; }
+        .video-container { position: relative; width: 80%; max-width: 800px; height: 60%; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        #remote-video { width: 100%; height: 100%; object-fit: cover; }
+        #local-video { position: absolute; bottom: 20px; right: 20px; width: 120px; height: 160px; background: #222; border-radius: 10px; object-fit: cover; border: 2px solid var(--accent); }
+        .call-controls { margin-top: 20px; display: flex; gap: 20px; }
+        .end-call-btn { background: var(--danger); color: white; border: none; padding: 15px 30px; border-radius: 30px; cursor: pointer; font-weight: bold; font-size: 16px; }
+
+        /* Модалки */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .modal { background: var(--bg-panel); padding: 25px; border-radius: 12px; width: 450px; }
+        .modal textarea { width: 100%; height: 80px; background: var(--bg-dark); color: #03dac6; border: 1px solid var(--border); border-radius: 6px; padding: 10px; resize: none; margin-bottom: 10px; font-family: monospace; font-size: 11px;}
+        .modal button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 5px; font-weight: bold; }
+        .modal input { width: 100%; padding: 12px; margin-bottom: 10px; background: var(--bg-dark); border: 1px solid var(--border); color: white; border-radius: 6px;}
+    </style>
+</head>
+<body>
+
+    <!-- АВТОРИЗАЦИЯ -->
+    <div id="auth-screen">
+        <div class="auth-box">
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="tab-login" onclick="switchTab('login')">Вход</div>
+                <div class="auth-tab" id="tab-register" onclick="switchTab('register')">Регистрация</div>
+            </div>
+            <h2 style="margin-bottom: 5px;">Mesh Network</h2>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Ваше устройство станет сервером-узлом</p>
+            
+            <input type="text" id="auth-login" placeholder="Логин (Ваш ID в сети)">
+            <input type="password" id="auth-pass" placeholder="Пароль">
+            <button id="btn-action" onclick="handleAuth()">Запустить Узел</button>
+            <p id="auth-error" style="color: var(--danger); font-size: 13px; margin-top: 10px; display: none;"></p>
+        </div>
+    </div>
+
+    <!-- ИНТЕРФЕЙС -->
+    <div id="app">
+        <div id="sidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <div class="avatar" id="my-avatar" style="width: 35px; height: 35px; font-size: 14px;">U</div>
+                    <span id="my-name-display">User</span>
+                </div>
+                <button class="logout-btn" onclick="logout()">Выйти</button>
+            </div>
+            <div id="network-status">🌐 Узлов подключено напрямую: 0</div>
+            <div style="padding: 15px; text-align: center;">
+                <button style="width: 100%; padding: 10px; background: var(--bg-hover); color: white; border: 1px dashed var(--mesh-color); border-radius: 6px; cursor: pointer;" onclick="openConnectModal()">➕ Добавить Узел (Сид)</button>
+            </div>
+            <div id="contacts-list">
+                <div class="contact-item active">
+                    <div class="avatar" style="background: var(--mesh-color);">🌐</div>
+                    <div>
+                        <div style="font-weight: bold;">Глобальная Mesh-сеть</div>
+                        <div style="font-size: 0.8em; color: var(--text-muted);">Все устройства-сервера</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-area">
+            <div class="chat-header">
+                <div>
+                    <div style="font-weight: bold; font-size: 18px;">Общий Mesh-Канал</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Сообщения ретранслируются через устройства</div>
+                </div>
+                <button class="call-btn" onclick="startCallBroadcast()">📞 Позвонить в сеть</button>
+            </div>
+            
+            <div id="messages"></div>
+
+            <div class="chat-input-area">
+                <input type="text" id="msg-input" placeholder="Написать в сеть..." onkeypress="if(event.key === 'Enter') sendMeshMessage()">
+                <button class="send-btn" onclick="sendMeshMessage()">➤</button>
+            </div>
+
+            <!-- ОВЕРЛЕЙ ЗВОНКА -->
+            <div id="call-overlay">
+                <h2 id="call-status" style="margin-bottom: 20px; color: white;">Вызов...</h2>
+                <div class="video-container">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <video id="local-video" autoplay playsinline muted></video>
+                </div>
+                <div class="call-controls">
+                    <button class="end-call-btn" onclick="endCall()">🔴 Завершить</button>
+                    <button id="accept-call-btn" style="display:none; background: var(--success); color: white; border: none; padding: 15px 30px; border-radius: 30px; cursor: pointer; font-weight: bold; font-size: 16px;" onclick="acceptCall()">🟢 Ответить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА ПОДКЛЮЧЕНИЯ (СИДЫ) -->
+    <div id="connect-modal" class="modal-overlay">
+        <div class="modal">
+            <h3>Соединить Узлы</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">STUN-сервера найдут вас даже на разных Wi-Fi. Обменяйтесь сидами один раз.</p>
+            
+            <input type="text" id="peer-name" placeholder="Имя узла (для себя)">
+            <button onclick="generateOffer()">1. Создать Сид-Приглашение</button>
+            <textarea id="my-seed" readonly placeholder="Здесь появится ваш сид..."></textarea>
+            
+            <textarea id="peer-seed" placeholder="2. Вставьте сид друга сюда..."></textarea>
+            <button onclick="acceptSeed()">3. Подключить Узел</button>
+            
+            <button style="background: transparent; border: 1px solid var(--danger); color: var(--danger); margin-top: 15px;" onclick="closeModal()">Отмена</button>
+        </div>
+    </div>
+
+<script>
+    // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+    let myId = "";
+    let authMode = 'login';
+    
+    // Mesh-логика
+    let peers = {}; // Хранилище всех прямых подключений (узлов)
+    let seenMessages = new Set(); // Защита от бесконечного цикла сообщений
+    let tempPeerName = ""; 
+    let tempConnection = null;
+
+    // STUN сервера для пробития разных Wi-Fi и IP
+    const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+    // Звонки
+    let callPC;
+    let localStream;
+    let pendingCallOffer = null;
+    let activeCallPeer = null; // С кем сейчас говорим
+
+    // --- 1. АВТОРИЗАЦИЯ (СОХРАНЕНИЕ СЕССИИ) ---
+    window.onload = () => {
+        if (localStorage.getItem("mesh_session") === "true" && localStorage.getItem("mesh_user")) {
+            myId = localStorage.getItem("mesh_user");
+            showApp();
+        }
+    };
+
+    function switchTab(mode) {
+        authMode = mode;
+        document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+        document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+        document.getElementById('btn-action').innerText = mode === 'login' ? 'Войти' : 'Зарегистрироваться';
+    }
+
+    function handleAuth() {
+        const login = document.getElementById("auth-login").value.trim();
+        const pass = document.getElementById("auth-pass").value;
+        const errorEl = document.getElementById("auth-error");
+
+        if (!login || !pass) return showError("Введите логин и пароль!");
+
+        if (authMode === 'register') {
+            if (localStorage.getItem("muser_" + login)) return showError("Пользователь существует!");
+            localStorage.setItem("muser_" + login, pass);
+            loginSuccess(login);
+        } else {
+            if (localStorage.getItem("muser_" + login) !== pass) return showError("Неверный пароль!");
+            loginSuccess(login);
+        }
+    }
+
+    function showError(text) {
+        const el = document.getElementById("auth-error");
+        el.innerText = text; el.style.display = "block";
+    }
+
+    function loginSuccess(login) {
+        myId = login;
+        localStorage.setItem("mesh_user", login);
+        localStorage.setItem("mesh_session", "true");
+        showApp();
+    }
+
+    function logout() {
+        localStorage.setItem("mesh_session", "false");
+        location.reload();
+    }
+
+    function showApp() {
+        document.getElementById("auth-screen").style.display = "none";
+        document.getElementById("app").style.display = "flex";
+        document.getElementById("my-name-display").innerText = myId;
+        document.getElementById("my-avatar").innerText = myId.charAt(0).toUpperCase();
+    }
+
+    // --- 2. ЛОГИКА MESH-СЕТИ (УСТРОЙСТВО КАК СЕРВЕР) ---
+    function createPeerConnection(peerName) {
+        const pc = new RTCPeerConnection(servers);
+        pc.onicecandidate = (e) => {
+            if (e.candidate === null) document.getElementById("my-seed").value = btoa(JSON.stringify(pc.localDescription));
+        };
+        pc.ondatachannel = (e) => setupDataChannel(e.channel, peerName);
+        return pc;
+    }
+
+    function setupDataChannel(channel, peerName) {
+        channel.onopen = () => {
+            peers[peerName] = { connection: tempConnection, channel: channel };
+            updateNetworkStatus();
+            closeModal();
+            alert(`Узел [${peerName}] подключен! Теперь ваш телефон работает как сервер-мост для него.`);
+        };
+
+        channel.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            // Если это текстовое сообщение для Mesh-сети
+            if (data.type === 'mesh_text') {
+                handleIncomingMeshMessage(data, peerName);
+            } 
+            // Если это сигналы для ЗВОНКА
+            else if (data.type === 'call_offer') {
+                activeCallPeer = peerName;
+                showIncomingCall(data.offer, data.sender);
+            } 
+            else if (data.type === 'call_answer') {
+                if(callPC) callPC.setRemoteDescription(data.answer);
+            } 
+            else if (data.type === 'call_ice') {
+                if(callPC) callPC.addIceCandidate(data.candidate).catch(e=>console.log(e));
+            } 
+            else if (data.type === 'call_end') {
+                closeCallUI();
+            }
+        };
+    }
+
+    // САМОЕ ГЛАВНОЕ: Ретрансляция (Телефон работает как сервер)
+    function handleIncomingMeshMessage(data, receivedFrom) {
+        // Защита от спама: если мы уже видели этот ID сообщения, игнорируем
+        if (seenMessages.has(data.id)) return;
+        seenMessages.add(data.id);
+
+        // Показываем сообщение на нашем экране
+        renderMessage(data.sender, data.text, 'msg-in', data.time);
+
+        // РАБОТАЕМ КАК СЕРВЕР: Пересылаем сообщение всем остальным узлам!
+        for (let peer in peers) {
+            if (peer !== receivedFrom && peers[peer].channel.readyState === "open") {
+                peers[peer].channel.send(JSON.stringify(data));
+            }
+        }
+    }
+
+    function sendMeshMessage() {
+        const input = document.getElementById("msg-input");
+        const text = input.value.trim();
+        if (!text) return;
+
+        const msgId = myId + "-" + Date.now();
+        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+        const messageData = { type: 'mesh_text', id: msgId, sender: myId, text: text, time: time };
+        
+        seenMessages.add(msgId); // Запоминаем свое сообщение
+        renderMessage("Вы", text, 'msg-out', time);
+
+        // Рассылаем всем подключенным узлам
+        for (let peer in peers) {
+            if (peers[peer].channel.readyState === "open") {
+                peers[peer].channel.send(JSON.stringify(messageData));
+            }
+        }
+        input.value = "";
+    }
+
+    // --- 3. ОБМЕН СИДАМИ ---
+    function openConnectModal() { document.getElementById("connect-modal").style.display = "flex"; }
+    function closeModal() { document.getElementById("connect-modal").style.display = "none"; }
+
+    async function generateOffer() {
+        tempPeerName = document.getElementById("peer-name").value.trim() || "Узел_" + Math.floor(Math.random()*1000);
+        tempConnection = createPeerConnection(tempPeerName);
+        const channel = tempConnection.createDataChannel("mesh");
+        setupDataChannel(channel, tempPeerName);
+
+        const offer = await tempConnection.createOffer();
+        await tempConnection.setLocalDescription(offer);
+        document.getElementById("my-seed").value = "Поиск IP адресов (STUN)...";
+    }
+
+    async function acceptSeed() {
+        const seedStr = document.getElementById("peer-seed").value.trim();
+        if (!seedStr) return alert("Вставьте сид!");
+
+        if (!tempConnection) {
+            tempPeerName = document.getElementById("peer-name").value.trim() || "Узел_" + Math.floor(Math.random()*1000);
+            tempConnection = createPeerConnection(tempPeerName);
+        }
+
+        try {
+            const desc = JSON.parse(atob(seedStr));
+            await tempConnection.setRemoteDescription(desc);
+            if (desc.type === "offer") {
+                const answer = await tempConnection.createAnswer();
+                await tempConnection.setLocalDescription(answer);
+                document.getElementById("my-seed").value = "Генерация ответа...";
+                alert("Скопируйте ВАШ сид и отправьте контакту!");
+            }
+        } catch (e) { alert("Ошибка сида!"); }
+    }
+
+    // --- 4. ЗВОНКИ (АВТОМАТИЧЕСКИЕ ЧЕРЕЗ MESH-КАНАЛ) ---
+    async function setupCallPC(peerName) {
+        callPC = new RTCPeerConnection(servers);
+        
+        // Передаем технические данные звонка через текстовый канал
+        callPC.onicecandidate = (e) => {
+            if (e.candidate && peers[peerName] && peers[peerName].channel.readyState === "open") {
+                peers[peerName].channel.send(JSON.stringify({ type: 'call_ice', candidate: e.candidate }));
+            }
+        };
+
+        callPC.ontrack = (e) => { document.getElementById("remote-video").srcObject = e.streams[0]; };
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: true });
+            document.getElementById("local-video").srcObject = localStream;
+            localStream.getTracks().forEach(track => callPC.addTrack(track, localStream));
+        } catch (err) {
+            alert("Ошибка камеры. Проверьте разрешения бразуера.");
+            throw err;
+        }
+    }
+
+    async function startCallBroadcast() {
+        const peerNames = Object.keys(peers);
+        if (peerNames.length === 0) return alert("Сначала подключите хотя бы один узел!");
+        
+        // Для простоты в Mesh сети звоним первому попавшемуся прямому узлу
+        activeCallPeer = peerNames[0]; 
+        
+        document.getElementById("call-overlay").style.display = "flex";
+        document.getElementById("call-status").innerText = `Звоним узлу...`;
+        document.getElementById("accept-call-btn").style.display = "none";
+
+        await setupCallPC(activeCallPeer);
+        const offer = await callPC.createOffer();
+        await callPC.setLocalDescription(offer);
+
+        peers[activeCallPeer].channel.send(JSON.stringify({ type: 'call_offer', sender: myId, offer: offer }));
+    }
+
+    function showIncomingCall(offer, senderName) {
+        pendingCallOffer = offer;
+        document.getElementById("call-overlay").style.display = "flex";
+        document.getElementById("call-status").innerText = `Входящий звонок от: ${senderName}`;
+        document.getElementById("accept-call-btn").style.display = "block";
+    }
+
+    async function acceptCall() {
+        document.getElementById("accept-call-btn").style.display = "none";
+        document.getElementById("call-status").innerText = "Соединение...";
+
+        await setupCallPC(activeCallPeer);
+        await callPC.setRemoteDescription(pendingCallOffer);
+        const answer = await callPC.createAnswer();
+        await callPC.setLocalDescription(answer);
+
+        peers[activeCallPeer].channel.send(JSON.stringify({ type: 'call_answer', answer: answer }));
+        document.getElementById("call-status").innerText = "Разговор (Зашифровано E2EE)";
+    }
+
+    function endCall() {
+        if (activeCallPeer && peers[activeCallPeer] && peers[activeCallPeer].channel.readyState === "open") {
+            peers[activeCallPeer].channel.send(JSON.stringify({ type: 'call_end' }));
+        }
+        closeCallUI();
+    }
+
+    function closeCallUI() {
+        document.getElementById("call-overlay").style.display = "none";
+        activeCallPeer = null; pendingCallOffer = null;
+        if (callPC) { callPC.close(); callPC = null; }
+        if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+        document.getElementById("local-video").srcObject = null;
+        document.getElementById("remote-video").srcObject = null;
+    }
+
+    // --- 5. ОТРИСОВКА ---
+    function renderMessage(sender, text, type, time) {
+        const box = document.getElementById("messages");
+        const div = document.createElement("div");
+        div.className = `msg ${type}`;
+        let senderHtml = type === 'msg-in' ? `<div class="msg-sender">${sender}</div>` : '';
+        div.innerHTML = `${senderHtml}${text} <span class="msg-time">${time}</span>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function updateNetworkStatus() {
+        document.getElementById("network-status").innerText = `🌐 Узлов подключено напрямую: ${Object.keys(peers).length}`;
+    }
+</script>
+</body>
+</html>
